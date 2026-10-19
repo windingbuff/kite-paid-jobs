@@ -1,0 +1,10 @@
+{
+  "project": "kite-paid-jobs",
+  "status": "PASS",
+  "checks": [
+    "real HTTP unpaid preflight",
+    "x402 v2 terms"
+  ],
+  "evidence_level": "E1",
+  "configured_assets": "synthetic local QA addresses; not verified assets"
+}

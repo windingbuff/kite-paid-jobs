@@ -1,0 +1,10 @@
+{
+  "operation_id": "sample-operation",
+  "spec_version": "text-index-v1",
+  "documents": [
+    {
+      "id": "one",
+      "text": "Kite Agents purchase useful work."
+    }
+  ]
+}

@@ -1,0 +1,39 @@
+schema: 1
+name: kite-paid-jobs
+display_name: Paid Jobs
+description: Durable paid job fulfillment and wallet-authenticated free
+  retrieval. Evaluation draft; actual payment/deployment verification is
+  pending.
+maintainer:
+  github: windingbuff
+status: draft
+network: eip155:2368
+pay_to: "0x0000000000000000000000000000000000000000"
+source: custom
+upstream:
+  name: Paid Jobs
+  url: https://github.com/windingbuff/kite-paid-jobs
+  requires_api_key: false
+endpoints:
+  - method: POST
+    path: /v1/jobs
+    summary: Durable paid job fulfillment and wallet-authenticated free retrieval
+    price_usd: "0.01"
+    example_request:
+      body:
+        operation_id: sample-operation
+        spec_version: text-index-v1
+        documents:
+          - id: one
+            text: Kite Agents purchase useful work.
+    pitfalls:
+      - "Draft only: configure a real receiver, asset and public origin before
+        deployment."
+      - Use an approved original Passport session; unknown settlement is not
+        permission to repurchase.
+categories:
+  - data
+tags:
+  - kite
+  - x402
+  - agent-services
