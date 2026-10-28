@@ -134,3 +134,41 @@ test("completed poll follows authenticated same-origin artifact with original se
   assert.equal(calls.length, 2);
   assert(calls.every((c) => c.session === "original-session"));
 });
+test("custom processors require confirmation and cannot be dispatched by the wrong worker", async (t) => {
+  const d = mkdtempSync(join(tmpdir(), "processor-"));
+  t.after(() => rmSync(d, { recursive: true, force: true }));
+  const vault = new Vault(d, randomBytes(32).toString("hex"));
+  let calls = 0;
+  const custom = new Jobs(vault, {
+    specVersion: "custom-v1",
+    validate: (i) => assert.equal(i.payload, "input"),
+    processor: async (i) => {
+      calls++;
+      return { output: i.payload.toUpperCase() };
+    },
+  });
+  let id;
+  await vault.transaction((s, save) => {
+    id = custom.prepare(
+      {
+        operation_id: "custom-job",
+        spec_version: "custom-v1",
+        payload: "input",
+      },
+      "buyer",
+      s,
+    ).job_id;
+    s.payments = { "custom-job": { payment_state: "UNKNOWN" } };
+    save();
+  });
+  assert.equal(await custom.tick(), false);
+  assert.equal(calls, 0);
+  await vault.transaction((s, save) => {
+    s.payments["custom-job"].payment_state = "CONFIRMED";
+    save();
+  });
+  assert.equal(await new Jobs(vault).tick(), false);
+  await custom.tick();
+  assert.equal((await custom.get(id, "buyer", true)).result.output, "INPUT");
+  assert.equal(calls, 1);
+});

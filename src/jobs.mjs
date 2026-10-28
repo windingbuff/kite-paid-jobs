@@ -53,12 +53,33 @@ export function textIndex(input) {
 export class Jobs {
   constructor(
     vault,
-    { retentionMs = 86400000, leaseMs = 60000, processor = textIndex } = {},
+    {
+      retentionMs = 86400000,
+      leaseMs = 60000,
+      processor = textIndex,
+      validate = checkJob,
+      specVersion = "text-index-v1",
+    } = {},
   ) {
-    Object.assign(this, { vault, retentionMs, leaseMs, processor });
+    if (
+      typeof processor !== "function" ||
+      typeof validate !== "function" ||
+      !/^[a-z0-9-]{3,60}$/.test(specVersion)
+    )
+      throw fault("invalid_processor");
+    Object.assign(this, {
+      vault,
+      retentionMs,
+      leaseMs,
+      processor,
+      validate,
+      specVersion,
+    });
   }
   prepare(input, payer, state) {
-    checkJob(input);
+    if (input.spec_version !== this.specVersion)
+      throw fault("invalid_job_spec");
+    this.validate(input);
     state.jobs ??= {};
     const id = randomUUID();
     state.jobs[id] = {
@@ -77,7 +98,7 @@ export class Jobs {
       pollUrl: "/v1/jobs/" + id,
       result: null,
       contract: {
-        task: "text-index-v1",
+        task: this.specVersion,
         retention_seconds: this.retentionMs / 1000,
         expected_seconds: 30,
         failure_policy: "paid_unfulfilled_manual_review_no_automatic_refund",
@@ -91,6 +112,7 @@ export class Jobs {
       for (const job of Object.values(s.jobs)) {
         const payment = s.payments?.[job.operation_id];
         if (payment?.payment_state !== "CONFIRMED") continue;
+        if (job.input.spec_version !== this.specVersion) continue;
         if (job.status === "ACCEPTED") job.status = "QUEUED";
         if (job.status === "RUNNING" && job.lease_until > Date.now()) continue;
         if (!["QUEUED", "RUNNING"].includes(job.status)) continue;
@@ -100,6 +122,7 @@ export class Jobs {
           continue;
         }
         job.status = "RUNNING";
+        payment.fulfillment_state = "RUNNING";
         job.attempts++;
         job.lease_id = randomUUID();
         job.lease_until = Date.now() + this.leaseMs;
@@ -112,6 +135,8 @@ export class Jobs {
     let result, error;
     try {
       result = await this.processor(claimed.input);
+      if (result === undefined || result === null)
+        throw fault("invalid_processor_result");
     } catch {
       error = "paid_unfulfilled_manual_review";
     }
